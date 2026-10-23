@@ -1,0 +1,37 @@
+{
+  "name": "@majikah/majik-signature-client-tauri",
+  "version": "0.1.0",
+  "description": "Typed TypeScript facade over tauri-plugin-majik-signature-client. Extends the key client facade; keys, contacts, stamps, logs and signing live in Rust.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "package": "npm run build && npm version patch && git push && git push --tags",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@majikah/majik-key-client-tauri": "^1.0.0",
+    "@tauri-apps/api": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@majikah/majik-key-client-tauri": "^1.0.0",
+    "@tauri-apps/api": ">=2.0.0",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
