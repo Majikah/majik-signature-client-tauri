@@ -1,6 +1,6 @@
 {
   "name": "@majikah/majik-signature-client-tauri",
-  "version": "1.2.0",
+  "version": "0.1.0",
   "description": "Typed TypeScript facade over tauri-plugin-majik-signature-client. Extends the key client facade; keys, contacts, stamps, logs and signing live in Rust.",
   "license": "Apache-2.0",
   "type": "module",
