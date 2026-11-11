@@ -23,3 +23,25 @@ Errors are `MajikKeyClientError` with `.kind` (`unlockRequired`, `fileNotFound`,
 
 Subclass it for online features (`MajikSignatureClientDatabase`): `this.invoke()` for any command, your own axios layer on top.
 `npm run build` first builds `../majik-key-client-tauri-ts` (a `file:` dependency).
+
+## License
+
+[Apache-2.0](LICENSE) — free for personal and commercial use.
+
+---
+## Author
+
+Developed by **Josef Elijah Fabian (Zelijah)** | [Majikah Solutions OPC](https://majikah.solutions/about)
+
+## About the Developer
+
+- **Developer**: Josef Elijah Fabian
+- **GitHub**: [https://github.com/jedlsf](https://github.com/jedlsf)
+- **Project Repository**: [https://github.com/Majikah/majik-signature-client-tauri](https://github.com/Majikah/majik-signature-client-tauri)
+
+---
+
+## Contact
+
+- **Business Email**: [business@thezelijah.world](mailto:business@thezelijah.world)
+- **Official Website**: [https://www.thezelijah.world](https://www.thezelijah.world)
