@@ -115,6 +115,26 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
     return opened;
   }
 
+  /** Build the current Rust snapshot without rehydrating storage. */
+  snapshotSignatureClient(): Promise<unknown> {
+    return this.invoke<unknown>("snapshot");
+  }
+
+  /** Open the signature session and hydrate the Rust client if needed. */
+  openSignatureSession(): Promise<OpenedSession> {
+    return this.invoke<OpenedSession>("open_session");
+  }
+
+  /** Reload contacts, logs, stamps and keys from storage without clobbering the key client setup. */
+  hydrateSignatureClient(): Promise<SigHydrateReport> {
+    return this.invoke<SigHydrateReport>("hydrate");
+  }
+
+  /** Reset managed signature data while preserving audit history. */
+  resetData(): Promise<void> {
+    return this.invoke<void>("reset_data");
+  }
+
   /** Subscribe to the signature client's own events (`sign`, `new-stamp`, `new-contact`, ...). */
   onSig<K extends SigOnlyEventType>(
     type: K,
@@ -148,7 +168,7 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
 
   /** Update an own account's contact meta (a non-empty label also renames the key). */
   updateOwnAccountMeta(id: string, meta: MajikContactMeta): Promise<void> {
-    return this.mutate<void>("update_own_account_meta", compact({ id, meta }));
+    return this.invoke<void>("update_own_account_meta", compact({ id, meta }));
   }
 
   getUserAppPreferences(): Promise<UserAppPreferences> {
@@ -607,6 +627,17 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
     return this.invoke<FileChain>("verify_file_chain", compact({ input, now }));
   }
 
+  verifyFileDetachedChain(
+    input: FileInput,
+    envelope: FileInput,
+    now?: string,
+  ): Promise<FileChain> {
+    return this.invoke<FileChain>(
+      "verify_file_detached_chain",
+      compact({ input, envelope, now }),
+    );
+  }
+
   verifyFileRevisions(
     finalFile: FileInput,
     revisions: FileInput[],
@@ -614,6 +645,17 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
     return this.invoke<RevisionSet>(
       "verify_file_revisions",
       compact({ finalFile, revisions }),
+    );
+  }
+
+  verifyFileRevisionsDetached(
+    finalFile: FileInput,
+    revisions: FileInput[],
+    envelope: FileInput,
+  ): Promise<RevisionSet> {
+    return this.invoke<RevisionSet>(
+      "verify_file_revisions_detached",
+      compact({ finalFile, revisions, envelope }),
     );
   }
 
