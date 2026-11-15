@@ -235,6 +235,36 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
     return this.invoke<boolean>("is_signing_session_active");
   }
 
+  /** Resolve the account's domain-separated Majik Key Solana signer address. */
+  getSolanaSignerAddress(accountId?: string): Promise<string> {
+    return this.invoke<string>(
+      "get_solana_signer_address",
+      compact({ accountId }),
+    );
+  }
+
+  /**
+   * Sign exact message bytes with the Majik Key Solana signer.
+   * Only the 64-byte signature is returned; private key material remains in Rust.
+   */
+  async signSolanaMessage(
+    message: Uint8Array,
+    accountId?: string,
+  ): Promise<Uint8Array> {
+    const signature = await this.invoke<number[]>(
+      "sign_solana_message",
+      compact({ message: Array.from(message), accountId }),
+    );
+    if (
+      !Array.isArray(signature) ||
+      signature.length !== 64 ||
+      !signature.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)
+    ) {
+      throw new Error("Rust returned an invalid Solana Ed25519 signature.");
+    }
+    return Uint8Array.from(signature);
+  }
+
   listContacts(
     sortedByLabel?: boolean,
     majikahOnly?: boolean,
