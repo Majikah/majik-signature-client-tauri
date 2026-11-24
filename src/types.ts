@@ -219,6 +219,52 @@ export interface SessionSigned {
   mimeType: string;
 }
 
+ 
+export interface SignRoomPublicEncryptionIdentity {
+  fingerprint: string;
+  publicKey: string;
+  mlKemPublicKey: string;
+}
+
+export interface SignRoomPublicRecipient {
+  fingerprint: string;
+  publicKey: string;
+  mlKemPublicKey: string;
+}
+
+export interface EncryptSignRoomFileArgs {
+  input: FileInput;
+  owner: SignRoomPublicEncryptionIdentity;
+  recipients?: SignRoomPublicRecipient[];
+  output?: OutputTarget;
+}
+
+export interface EncryptSignRoomFileResult {
+  file: BytesOutput;
+  contentHash: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
+export interface DecryptSignRoomFileArgs {
+  input: FileInput;
+  accountId: string;
+  expectedOriginalName: string;
+  expectedContentType: string;
+  expectedSizeBytes: number;
+  expectedContentHash: string;
+  output?: OutputTarget;
+}
+
+export interface DecryptSignRoomFileResult {
+  file: BytesOutput;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  contentHash: string;
+}
+
 export interface ResignArgs {
   previousSignedFile: FileInput;
   newFile: FileInput;
