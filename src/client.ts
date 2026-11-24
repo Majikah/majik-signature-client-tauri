@@ -48,6 +48,8 @@ import type {
   SignatoriesFilter,
   SignatureMetadata,
   SignDetachedArgs,
+  SignSessionFileArgs,
+  SessionSigned,
   SignedFile,
   SignerRef,
   SignFileArgs,
@@ -576,6 +578,11 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   /** Sign `input` and produce a separate `.mjksig` envelope. */
   signFileDetached(args: SignDetachedArgs): Promise<DetachedSigned> {
     return this.invoke<DetachedSigned>("sign_file_detached", compact({ args }));
+  }
+
+  /** Sign a SignRoom document using the issued challenge and revision-chain commitment. */
+  signSessionFile(args: SignSessionFileArgs): Promise<SessionSigned> {
+    return this.invoke<SessionSigned>("sign_session_file", compact({ args }));
   }
 
   resignFile(args: ResignArgs): Promise<SignedFile> {

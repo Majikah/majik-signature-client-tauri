@@ -177,6 +177,48 @@ export interface SignDetachedArgs {
   ctx?: Ctx;
 }
 
+/** Authoritative SignRoom context issued by the session service. */
+export interface SessionSigningContext {
+  sessionId: string;
+  challengeId: string;
+  policyHash: string;
+}
+
+/** Immutable SignRoom document-revision entry committed by the signature. */
+export interface FileVersion {
+  version: number;
+  timestamp: string;
+  contentHash: string;
+  createdBy: string;
+  previousVersionHash?: string;
+  message?: string;
+}
+
+export interface SignSessionFileOptions {
+  sessionContext: SessionSigningContext;
+  contentType?: string;
+  timestamp?: string;
+  mimeType?: string;
+  expectedSigners?: SignerRef[];
+  validUntil?: string;
+  existingEnvelope?: FileInput;
+  fileVersion?: FileVersion;
+  priorFile?: FileInput;
+  message?: string;
+}
+
+export interface SignSessionFileArgs {
+  input: FileInput;
+  options: SignSessionFileOptions;
+  ctx?: Ctx;
+}
+
+export interface SessionSigned {
+  signature: MajikSignatureJSON;
+  handler: string;
+  mimeType: string;
+}
+
 export interface ResignArgs {
   previousSignedFile: FileInput;
   newFile: FileInput;
