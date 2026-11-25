@@ -48,6 +48,12 @@ import type {
   SignatoriesFilter,
   SignatureMetadata,
   SignDetachedArgs,
+  SignSessionFileArgs,
+  SessionSigned,
+  EncryptSignRoomFileArgs,
+  EncryptSignRoomFileResult,
+  DecryptSignRoomFileArgs,
+  DecryptSignRoomFileResult,
   SignedFile,
   SignerRef,
   SignFileArgs,
@@ -576,6 +582,27 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   /** Sign `input` and produce a separate `.mjksig` envelope. */
   signFileDetached(args: SignDetachedArgs): Promise<DetachedSigned> {
     return this.invoke<DetachedSigned>("sign_file_detached", compact({ args }));
+  }
+
+  /** Sign a SignRoom document using the issued challenge and revision-chain commitment. */
+  signSessionFile(args: SignSessionFileArgs): Promise<SessionSigned> {
+    return this.invoke<SessionSigned>("sign_session_file", compact({ args }));
+  }
+
+  /** Encrypt a SignRoom source with the owner's public key and pinned recipients. */
+  encryptSignRoomFile(args: EncryptSignRoomFileArgs): Promise<EncryptSignRoomFileResult> {
+    return this.invoke<EncryptSignRoomFileResult>(
+      "encrypt_signroom_file",
+      compact({ args }),
+    );
+  }
+
+  /** Decrypt and verify a SignRoom MJKB with the selected local Majik Key. */
+  decryptSignRoomFile(args: DecryptSignRoomFileArgs): Promise<DecryptSignRoomFileResult> {
+    return this.invoke<DecryptSignRoomFileResult>(
+      "decrypt_signroom_file",
+      compact({ args }),
+    );
   }
 
   resignFile(args: ResignArgs): Promise<SignedFile> {

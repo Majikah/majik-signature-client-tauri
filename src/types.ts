@@ -177,6 +177,94 @@ export interface SignDetachedArgs {
   ctx?: Ctx;
 }
 
+/** Authoritative SignRoom context issued by the session service. */
+export interface SessionSigningContext {
+  sessionId: string;
+  challengeId: string;
+  policyHash: string;
+}
+
+/** Immutable SignRoom document-revision entry committed by the signature. */
+export interface FileVersion {
+  version: number;
+  timestamp: string;
+  contentHash: string;
+  createdBy: string;
+  previousVersionHash?: string;
+  message?: string;
+}
+
+export interface SignSessionFileOptions {
+  sessionContext: SessionSigningContext;
+  contentType?: string;
+  timestamp?: string;
+  mimeType?: string;
+  expectedSigners?: SignerRef[];
+  validUntil?: string;
+  existingEnvelope?: FileInput;
+  fileVersion?: FileVersion;
+  priorFile?: FileInput;
+  message?: string;
+}
+
+export interface SignSessionFileArgs {
+  input: FileInput;
+  options: SignSessionFileOptions;
+  ctx?: Ctx;
+}
+
+export interface SessionSigned {
+  signature: MajikSignatureJSON;
+  handler: string;
+  mimeType: string;
+}
+
+ 
+export interface SignRoomPublicEncryptionIdentity {
+  fingerprint: string;
+  publicKey: string;
+  mlKemPublicKey: string;
+}
+
+export interface SignRoomPublicRecipient {
+  fingerprint: string;
+  publicKey: string;
+  mlKemPublicKey: string;
+}
+
+export interface EncryptSignRoomFileArgs {
+  input: FileInput;
+  owner: SignRoomPublicEncryptionIdentity;
+  recipients?: SignRoomPublicRecipient[];
+  output?: OutputTarget;
+}
+
+export interface EncryptSignRoomFileResult {
+  file: BytesOutput;
+  contentHash: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
+export interface DecryptSignRoomFileArgs {
+  input: FileInput;
+  accountId: string;
+  expectedOriginalName: string;
+  expectedContentType: string;
+  expectedSizeBytes: number;
+  expectedContentHash: string;
+  output?: OutputTarget;
+}
+
+export interface DecryptSignRoomFileResult {
+  file: BytesOutput;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  contentHash: string;
+}
+
 export interface ResignArgs {
   previousSignedFile: FileInput;
   newFile: FileInput;
