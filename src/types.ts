@@ -326,6 +326,86 @@ export interface VerifyDetachedArgs {
   source?: HistorySource;
 }
 
+
+/** Read/write settings for native-path streaming operations. */
+export interface StreamingFileOptions {
+  /** Chunk size in bytes (64 KiB–8 MiB; defaults to 1 MiB). */
+  chunkSize?: number;
+  /** Optional maximum size for the source and any prior revision file. */
+  maxBytes?: number;
+}
+
+/** Common result for embedded and detached streaming signing. */
+export interface StreamingSignResult {
+  signature: MajikSignatureJSON;
+  output: {
+    path: string;
+    sizeBytes: number;
+  };
+  sourceSizeBytes: number;
+  handler: string;
+  mimeType: string;
+}
+
+/** Native-path embedded signing. File bytes never cross the webview IPC boundary. */
+export interface StreamingEmbeddedSignArgs {
+  operationId: string;
+  inputPath: string;
+  outputPath: string;
+  options?: Omit<SignFileOptions, "priorSignedFile">;
+  ctx?: Ctx;
+  streaming?: StreamingFileOptions;
+  overwrite?: boolean;
+}
+
+/** Native-path detached signing; existingEnvelope is separately size-bounded by Rust. */
+export interface StreamingDetachedSignArgs {
+  operationId: string;
+  inputPath: string;
+  outputPath: string;
+  options?: SignDetachedOptions;
+  ctx?: Ctx;
+  streaming?: StreamingFileOptions;
+  overwrite?: boolean;
+}
+
+/** Append an embedded revision using a native path to the previous signed file. */
+export interface StreamingEmbeddedRevisionArgs extends StreamingEmbeddedSignArgs {
+  priorFilePath: string;
+}
+
+/** Append a detached revision using a native path to the previous signed file. */
+export interface StreamingDetachedRevisionArgs extends StreamingDetachedSignArgs {
+  priorFilePath: string;
+}
+
+/** Verify an embedded signature without loading the whole source into webview memory. */
+export interface StreamingVerifyArgs {
+  operationId: string;
+  inputPath: string;
+  target?: VerifyTarget;
+  source?: HistorySource;
+  streaming?: StreamingFileOptions;
+}
+
+/** Verify a native file against a native detached envelope path. */
+export interface StreamingDetachedVerifyArgs extends StreamingVerifyArgs {
+  envelopePath: string;
+}
+
+/** Progress payload emitted while a native-path stream operation is running. */
+export interface StreamingProgressPayload {
+  operationId: string;
+  bytesProcessed: number;
+  totalBytes: number | null;
+}
+
+/** Envelope sent on the dedicated streaming-progress event channel. */
+export interface StreamingProgressEvent {
+  type: "stream-progress";
+  payload: StreamingProgressPayload;
+}
+
 export interface FileChain {
   latest: VerificationResult;
   history: Json[];
