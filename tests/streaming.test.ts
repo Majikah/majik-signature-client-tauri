@@ -1,0 +1,140 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  MajikSignatureClientTauri,
+  SIGNATURE_EVENT_CHANNEL,
+  SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL,
+} from "../src/index.js";
+import type { Transport } from "../src/index.js";
+
+type Listener = (payload: unknown) => void;
+
+class FakeTransport implements Transport {
+  calls: Array<{ command: string; args: Record<string, unknown> | undefined }> = [];
+  private readonly listeners = new Map<string, Set<Listener>>();
+
+  async invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+    this.calls.push({ command, args });
+    if (command === "open_session") {
+      return {
+        report: null,
+        snapshot: { accounts: [], activeAccountId: null, status: [] },
+      } as T;
+    }
+    return undefined as T;
+  }
+
+  async listen<T>(event: string, handler: (payload: T) => void): Promise<() => void> {
+    const listeners = this.listeners.get(event) ?? new Set<Listener>();
+    const wrapped = handler as unknown as Listener;
+    listeners.add(wrapped);
+    this.listeners.set(event, listeners);
+
+    return () => {
+      listeners.delete(wrapped);
+      if (listeners.size === 0) this.listeners.delete(event);
+    };
+  }
+
+  emit<T>(event: string, payload: T): void {
+    for (const listener of this.listeners.get(event) ?? []) listener(payload);
+  }
+
+  activeListeners(event: string): number {
+    return this.listeners.get(event)?.size ?? 0;
+  }
+
+  count(command: string): number {
+    return this.calls.filter((call) => call.command === command).length;
+  }
+}
+
+describe("native-path streaming facade", () => {
+  it("maps every streaming facade method to its Rust command", async () => {
+    const transport = new FakeTransport();
+    const client = await MajikSignatureClientTauri.open({ transport });
+
+    const signArgs = {
+      operationId: "op-embedded",
+      inputPath: "/tmp/source.mov",
+      outputPath: "/tmp/signed.mov",
+    };
+    const detachedArgs = {
+      operationId: "op-detached",
+      inputPath: "/tmp/source.mov",
+      outputPath: "/tmp/source.mjksig",
+    };
+    const verifyArgs = {
+      operationId: "op-verify",
+      inputPath: "/tmp/signed.mov",
+    };
+    const detachedVerifyArgs = {
+      operationId: "op-verify-detached",
+      inputPath: "/tmp/source.mov",
+      envelopePath: "/tmp/source.mjksig",
+    };
+
+    await client.signFileEmbeddedStream(signArgs);
+    await client.signFileDetachedStream(detachedArgs);
+    await client.signFileEmbeddedStreamWithPrior({
+      ...signArgs,
+      operationId: "op-embedded-revision",
+      priorFilePath: "/tmp/prior.signed.mov",
+    });
+    await client.signFileDetachedStreamWithPrior({
+      ...detachedArgs,
+      operationId: "op-detached-revision",
+      priorFilePath: "/tmp/prior.mov",
+    });
+    await client.verifyFileEmbeddedStream(verifyArgs);
+    await client.verifyFileDetachedStream(detachedVerifyArgs);
+    await client.cancelStream("op-embedded");
+
+    expect(transport.calls.filter((call) => call.command !== "open_session")).toEqual([
+      { command: "sign_file_embedded_stream", args: { args: signArgs } },
+      { command: "sign_file_detached_stream", args: { args: detachedArgs } },
+      {
+        command: "sign_file_embedded_stream_with_prior",
+        args: { args: { ...signArgs, operationId: "op-embedded-revision", priorFilePath: "/tmp/prior.signed.mov" } },
+      },
+      {
+        command: "sign_file_detached_stream_with_prior",
+        args: { args: { ...detachedArgs, operationId: "op-detached-revision", priorFilePath: "/tmp/prior.mov" } },
+      },
+      { command: "verify_file_embedded_stream", args: { args: verifyArgs } },
+      { command: "verify_file_detached_stream", args: { args: detachedVerifyArgs } },
+      { command: "cancel_stream", args: { operationId: "op-embedded" } },
+    ]);
+
+    await client.dispose();
+  });
+
+  it("subscribes to progress on its dedicated channel without refreshing the read-model", async () => {
+    const transport = new FakeTransport();
+    const client = await MajikSignatureClientTauri.open({ transport });
+    const listener = vi.fn();
+    const unsubscribe = client.onStreamProgress(listener);
+    const payload = {
+      operationId: "long-video",
+      bytesProcessed: 8 * 1024 * 1024,
+      totalBytes: 2 * 1024 * 1024 * 1024,
+    };
+
+    expect(transport.activeListeners(SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL)).toBe(1);
+    expect(transport.activeListeners(SIGNATURE_EVENT_CHANNEL)).toBe(1);
+
+    transport.emit(SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL, {
+      type: "stream-progress",
+      payload,
+    });
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith(payload);
+    expect(transport.count("get_snapshot")).toBe(0);
+
+    unsubscribe();
+    await client.dispose();
+    expect(transport.activeListeners(SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL)).toBe(0);
+    expect(transport.activeListeners(SIGNATURE_EVENT_CHANNEL)).toBe(0);
+  });
+});

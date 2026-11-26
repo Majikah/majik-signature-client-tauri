@@ -2,7 +2,7 @@
 
 TypeScript facade over `tauri-plugin-majik-signature-client`. Extends `MajikKeyClientTauri` (accounts, lock/unlock,
 passphrases, synchronous read-model and its events) and adds contacts, groups, stamps, logs, preferences, signing and
-verification, seals, signature maps and backups. 104 typed methods, generated from `gen.py`.
+verification, seals, signature maps, backups, and bounded-memory native-path streaming. 111 typed methods.
 
 ```ts
 const majik = await MajikSignatureClientTauri.open({ onUnlockRequested: askForPassphrase });
@@ -20,6 +20,44 @@ Files: pass `{ path }` (Rust reads/validates; nothing large crosses IPC) or, for
 Results: `output.path` writes to disk; otherwise read `outputBytes(result.file)` / `outputBlob(...)`.
 Errors are `MajikKeyClientError` with `.kind` (`unlockRequired`, `fileNotFound`, `fileNotAFile`, `fileUnreadable`, `fileEmpty`,
 `fileTooLarge`, `fileInvalid`, `fileExists`, `fileWriteFailed`, ...).
+
+## Native-path streaming
+
+For multi-gigabyte files, use the streaming methods instead of the legacy `FileInput` methods.
+They pass native paths directly to Rust and return metadata rather than materializing file bytes
+in the webview.
+
+```ts
+const operationId = crypto.randomUUID();
+const unsubscribe = majik.onStreamProgress((progress) => {
+  if (progress.operationId === operationId) {
+    console.info(progress.bytesProcessed, progress.totalBytes);
+  }
+});
+
+const signed = await majik.signFileEmbeddedStream({
+  operationId,
+  inputPath: "C:\\docs\\large-video.mov",
+  outputPath: "C:\\docs\\large-video.signed.mov",
+  streaming: { chunkSize: 4 * 1024 * 1024 },
+});
+
+unsubscribe();
+console.info(signed.output.path, signed.output.sizeBytes);
+```
+
+The facade also exposes `signFileDetachedStream`,
+`signFileEmbeddedStreamWithPrior`, `signFileDetachedStreamWithPrior`,
+`verifyFileEmbeddedStream`, and `verifyFileDetachedStream`. Revision methods take
+`priorFilePath`; they do not accept an in-memory prior file. Use `cancelStream(operationId)`
+to request cancellation, and `onStreamProgress()` to observe progress. A progress event contains
+`operationId`, `bytesProcessed`, and nullable `totalBytes`; it is delivered on the dedicated
+`majik-signature-client:stream-progress` channel to avoid unnecessary read-model refreshes.
+
+Streaming options allow a `chunkSize` between 64 KiB and 8 MiB (default 1 MiB) and an optional
+`maxBytes` limit. Signing writes atomically to `outputPath`; `overwrite` defaults to `false`.
+The detached envelope input remains separately bounded by Rust.
+
 
 Subclass it for online features (`MajikSignatureClientDatabase`): `this.invoke()` for any command, your own axios layer on top.
 `npm run build` first builds `../majik-key-client-tauri-ts` (a `file:` dependency).
