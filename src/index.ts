@@ -1,6 +1,7 @@
 export {
   MajikSignatureClientTauri,
   SIGNATURE_EVENT_CHANNEL,
+  SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL,
   SIGNATURE_PLUGIN,
   type MajikSignatureClientTauriOptions,
 } from "./client.js";
