@@ -57,6 +57,16 @@ import type {
   SignedFile,
   SignerRef,
   SignFileArgs,
+  StreamingDetachedRevisionArgs,
+  StreamingDetachedSignArgs,
+  StreamingDetachedVerifyArgs,
+  StreamingEmbeddedRevisionArgs,
+  StreamingEmbeddedSignArgs,
+  StreamingFileOptions,
+  StreamingProgressEvent,
+  StreamingProgressPayload,
+  StreamingSignResult,
+  StreamingVerifyArgs,
   SignTextOptions,
   SignTextResult,
   SkippedItem,
@@ -75,6 +85,8 @@ import type {
 
 export const SIGNATURE_PLUGIN = "majik-signature-client";
 export const SIGNATURE_EVENT_CHANNEL = "majik-signature-client:event";
+export const SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL =
+  "majik-signature-client:stream-progress";
 
 export type MajikSignatureClientTauriOptions = MajikKeyClientTauriOptions;
 
@@ -106,6 +118,11 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   /** Set by `open()` when this call hydrated the Rust client (null if it was already open). */
   lastSigHydrateReport: SigHydrateReport | null = null;
 
+  private unlistenStreamProgress: (() => void) | null = null;
+  private readonly streamProgressListeners = new Set<
+    (payload: StreamingProgressPayload) => void
+  >();
+
   constructor(options: MajikSignatureClientTauriOptions = {}) {
     super({
       plugin: SIGNATURE_PLUGIN,
@@ -115,10 +132,48 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   }
 
   protected override async initialize(): Promise<OpenedSession> {
-    const opened = await super.initialize();
-    this.lastSigHydrateReport =
-      opened.report as unknown as SigHydrateReport | null;
-    return opened;
+    // Progress events use a dedicated channel so they never trigger snapshot refreshes
+    // in the inherited key-client event pipeline.
+    this.unlistenStreamProgress = await this.transport.listen<StreamingProgressEvent>(
+      SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL,
+      (event) => {
+        if (event.type !== "stream-progress") return;
+        for (const listener of [...this.streamProgressListeners]) {
+          try {
+            listener(event.payload);
+          } catch (error) {
+            console.error("[majik-signature-client] stream progress listener threw", error);
+          }
+        }
+      },
+    );
+
+    try {
+      const opened = await super.initialize();
+      this.lastSigHydrateReport =
+        opened.report as unknown as SigHydrateReport | null;
+      return opened;
+    } catch (error) {
+      this.unlistenStreamProgress?.();
+      this.unlistenStreamProgress = null;
+      throw error;
+    }
+  }
+
+  /** Subscribe to native streaming progress without refreshing the signature read-model. */
+  onStreamProgress(
+    listener: (payload: StreamingProgressPayload) => void,
+  ): () => void {
+    this.streamProgressListeners.add(listener);
+    return () => this.streamProgressListeners.delete(listener);
+  }
+
+  /** Stop progress notifications before disposing the inherited key/signature session. */
+  override async dispose(): Promise<void> {
+    this.unlistenStreamProgress?.();
+    this.unlistenStreamProgress = null;
+    this.streamProgressListeners.clear();
+    await super.dispose();
   }
 
   /** Build the current Rust snapshot without rehydrating storage. */
@@ -572,6 +627,69 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
       "get_signature_metadata",
       compact({ serialized }),
     );
+  }
+
+  /** Stream-sign a native file path and atomically publish the embedded output. */
+  signFileEmbeddedStream(
+    args: StreamingEmbeddedSignArgs,
+  ): Promise<StreamingSignResult> {
+    return this.invoke<StreamingSignResult>(
+      "sign_file_embedded_stream",
+      compact({ args }),
+    );
+  }
+
+  /** Stream-sign a native file path and atomically publish a detached .mjksig envelope. */
+  signFileDetachedStream(
+    args: StreamingDetachedSignArgs,
+  ): Promise<StreamingSignResult> {
+    return this.invoke<StreamingSignResult>(
+      "sign_file_detached_stream",
+      compact({ args }),
+    );
+  }
+
+  /** Stream-sign an embedded revision using a native path to the prior signed file. */
+  signFileEmbeddedStreamWithPrior(
+    args: StreamingEmbeddedRevisionArgs,
+  ): Promise<StreamingSignResult> {
+    return this.invoke<StreamingSignResult>(
+      "sign_file_embedded_stream_with_prior",
+      compact({ args }),
+    );
+  }
+
+  /** Stream-sign a detached revision using a native path to the prior signed file. */
+  signFileDetachedStreamWithPrior(
+    args: StreamingDetachedRevisionArgs,
+  ): Promise<StreamingSignResult> {
+    return this.invoke<StreamingSignResult>(
+      "sign_file_detached_stream_with_prior",
+      compact({ args }),
+    );
+  }
+
+  /** Verify an embedded signature directly from a native file path. */
+  verifyFileEmbeddedStream(args: StreamingVerifyArgs): Promise<VerifyResult> {
+    return this.invoke<VerifyResult>(
+      "verify_file_embedded_stream",
+      compact({ args }),
+    );
+  }
+
+  /** Verify a native file against a detached envelope path. */
+  verifyFileDetachedStream(
+    args: StreamingDetachedVerifyArgs,
+  ): Promise<VerifyResult> {
+    return this.invoke<VerifyResult>(
+      "verify_file_detached_stream",
+      compact({ args }),
+    );
+  }
+
+  /** Request cancellation; resolves true only when the operation ID was active. */
+  cancelStream(operationId: string): Promise<boolean> {
+    return this.invoke<boolean>("cancel_stream", compact({ operationId }));
   }
 
   /** Sign `input` and embed the signature. Writes to `output.path`, or returns bytes inline. */
