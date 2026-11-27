@@ -346,6 +346,8 @@ export interface SystemProfile {
   totalMemoryBytes: number;
   availableMemoryBytes: number;
   hostAvailableMemoryBytes: number;
+  /** False when sysinfo could not initialize; available memory may then come from cgroups. */
+  memoryProbeSucceeded: boolean;
   cgroupMemoryLimitBytes: number | null;
   cpuThreads: number;
   architecture: string;
