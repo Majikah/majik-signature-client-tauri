@@ -63,6 +63,8 @@ import type {
   StreamingEmbeddedRevisionArgs,
   StreamingEmbeddedSignArgs,
   StreamingFileOptions,
+  SystemProfile,
+  RecommendedStreamingConfig,
   StreamingProgressEvent,
   StreamingProgressPayload,
   StreamingSignResult,
@@ -685,6 +687,16 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
       "verify_file_detached_stream",
       compact({ args }),
     );
+  }
+
+  /** Inspect current RAM availability, CPU concurrency and platform information. */
+  getSystemProfile(): Promise<SystemProfile> {
+    return this.invoke<SystemProfile>("get_system_profile");
+  }
+
+  /** Retrieve the native plugin's current adaptive streaming recommendation. */
+  getRecommendedStreamingConfig(): Promise<RecommendedStreamingConfig> {
+    return this.invoke<RecommendedStreamingConfig>("get_recommended_streaming_config");
   }
 
   /** Request cancellation; resolves true only when the operation ID was active. */

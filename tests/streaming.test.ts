@@ -109,6 +109,40 @@ describe("native-path streaming facade", () => {
     await client.dispose();
   });
 
+  it("exposes native system profile and adaptive streaming recommendations", async () => {
+    const transport = new FakeTransport();
+    const client = await MajikSignatureClientTauri.open({ transport });
+
+    await client.getSystemProfile();
+    await client.getRecommendedStreamingConfig();
+
+    expect(transport.calls.filter((call) => call.command !== "open_session")).toEqual([
+      { command: "get_system_profile", args: undefined },
+      { command: "get_recommended_streaming_config", args: undefined },
+    ]);
+
+    await client.signFileEmbeddedStream({
+      operationId: "op-auto",
+      inputPath: "/tmp/source.mov",
+      outputPath: "/tmp/signed.mov",
+      streaming: { chunkSize: null },
+    });
+
+    expect(transport.calls.at(-1)).toEqual({
+      command: "sign_file_embedded_stream",
+      args: {
+        args: {
+          operationId: "op-auto",
+          inputPath: "/tmp/source.mov",
+          outputPath: "/tmp/signed.mov",
+          streaming: { chunkSize: null },
+        },
+      },
+    });
+
+    await client.dispose();
+  });
+
   it("subscribes to progress on its dedicated channel without refreshing the read-model", async () => {
     const transport = new FakeTransport();
     const client = await MajikSignatureClientTauri.open({ transport });

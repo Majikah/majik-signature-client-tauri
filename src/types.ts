@@ -329,10 +329,36 @@ export interface VerifyDetachedArgs {
 
 /** Read/write settings for native-path streaming operations. */
 export interface StreamingFileOptions {
-  /** Chunk size in bytes (64 KiB–8 MiB; defaults to 1 MiB). */
-  chunkSize?: number;
+  /**
+   * Preferred chunk size in bytes (64 KiB–128 MiB).
+   * Omit or set to null to use the current native system recommendation.
+   * Allocation failures automatically retry with the recommendation and smaller sizes.
+   */
+  chunkSize?: number | null;
+  /** Disable adaptive fallback after an explicit chunk-size allocation failure. */
+  strictChunkSize?: boolean;
   /** Optional maximum size for the source and any prior revision file. */
   maxBytes?: number;
+}
+
+/** Privacy-preserving system-resource profile returned by the native plugin. */
+export interface SystemProfile {
+  totalMemoryBytes: number;
+  availableMemoryBytes: number;
+  hostAvailableMemoryBytes: number;
+  cgroupMemoryLimitBytes: number | null;
+  cpuThreads: number;
+  architecture: string;
+  operatingSystem: string;
+}
+
+/** Native resource manager recommendation for one streaming operation. */
+export interface RecommendedStreamingConfig {
+  chunkSize: number;
+  memoryBudgetBytes: number;
+  maximumOverrideChunkSize: number;
+  automaticMaxChunkSize: number;
+  profile: "highPerformance" | "balanced" | "lowMemory";
 }
 
 /** Common result for embedded and detached streaming signing. */
@@ -398,6 +424,12 @@ export interface StreamingProgressPayload {
   operationId: string;
   bytesProcessed: number;
   totalBytes: number | null;
+  /** One-based streaming attempt; increases when an allocation retry begins. */
+  attempt?: number;
+  /** Chunk size used by this attempt, in bytes. */
+  effectiveChunkSize?: number;
+  /** True when this progress belongs to a fallback attempt. */
+  adaptiveFallback?: boolean;
 }
 
 /** Envelope sent on the dedicated streaming-progress event channel. */
