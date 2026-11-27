@@ -1,6 +1,6 @@
 {
   "name": "@majikah/majik-signature-client-tauri",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Typed TypeScript facade over tauri-plugin-majik-signature-client with bounded-memory native-path streaming APIs.",
   "license": "Apache-2.0",
   "type": "module",
