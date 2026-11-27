@@ -54,7 +54,7 @@ to request cancellation, and `onStreamProgress()` to observe progress. A progres
 `operationId`, `bytesProcessed`, and nullable `totalBytes`; it is delivered on the dedicated
 `majik-signature-client:stream-progress` channel to avoid unnecessary read-model refreshes.
 
-Streaming options accept a preferred `chunkSize` between 64 KiB and 128 MiB. Omit it or set it to `null` to use the native system recommendation. Allocation failures automatically retry with the system recommendation and progressively smaller sizes; set `strictChunkSize: true` to disable fallback. The automatic recommendation is capped at 64 MiB, while 128 MiB remains available as an explicit override. Signing writes atomically to `outputPath`; `overwrite` defaults to `false`. The detached envelope input remains separately bounded by Rust.
+Streaming options accept a preferred `chunkSize` between 64 KiB and 256 MiB. Omit it or set it to `null` to use the native system recommendation. Allocation failures automatically retry with the system recommendation and progressively smaller sizes; set `strictChunkSize: true` to disable fallback. The automatic recommendation is capped at 64 MiB, while 256 MiB remains available as an explicit override. Signing writes atomically to `outputPath`; `overwrite` defaults to `false`. The detached envelope input remains separately bounded by Rust.
 
 Use `getSystemProfile()` and `getRecommendedStreamingConfig()` to inspect the native resource profile and current recommendation. Streaming commands resolve their own recommendation at operation start, so callers do not need to query it before every operation. Progress updates include the effective chunk size, attempt number and whether adaptive fallback is active.
 

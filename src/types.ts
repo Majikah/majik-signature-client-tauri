@@ -330,7 +330,7 @@ export interface VerifyDetachedArgs {
 /** Read/write settings for native-path streaming operations. */
 export interface StreamingFileOptions {
   /**
-   * Preferred chunk size in bytes (64 KiB–128 MiB).
+   * Preferred chunk size in bytes (64 KiB–256 MiB).
    * Omit or set to null to use the current native system recommendation.
    * Allocation failures automatically retry with the recommendation and smaller sizes.
    */
