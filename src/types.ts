@@ -330,7 +330,7 @@ export interface VerifyDetachedArgs {
 /** Read/write settings for native-path streaming operations. */
 export interface StreamingFileOptions {
   /**
-   * Preferred chunk size in bytes (64 KiB–256 MiB).
+   * Preferred chunk size in bytes (64 KiB–64 MiB).
    * Omit or set to null to use the current native system recommendation.
    * Allocation failures automatically retry with the recommendation and smaller sizes.
    */
@@ -432,6 +432,12 @@ export interface StreamingProgressPayload {
   effectiveChunkSize?: number;
   /** True when this progress belongs to a fallback attempt. */
   adaptiveFallback?: boolean;
+  /** Zero-based index of the file currently being processed in a batch. */
+  fileIndex?: number;
+  /** Number of source files in the batch. */
+  totalFiles?: number;
+  /** Manifest path of the file currently being processed. */
+  path?: string;
 }
 
 /** Envelope sent on the dedicated streaming-progress event channel. */
@@ -517,6 +523,80 @@ export interface BatchDetached {
   failures: Failure[];
 }
 
+/** A source file for native-path detached batch signing or MJKSMAP verification. */
+export interface StreamingBatchPathInput {
+  /** Relative path committed in the MJKSMAP manifest. */
+  manifestPath: string;
+  /** Native filesystem path opened by Rust; source bytes do not cross IPC. */
+  sourcePath: string;
+  /** Optional MIME metadata; otherwise inferred from the file name. */
+  mimeType?: string;
+}
+
+/** Bounded chunking and optional per-file size policy for native batch operations. */
+export interface BatchStreamingFileOptions {
+  /** Requested native buffer size (64 KiB–64 MiB); defaults to the system recommendation. */
+  chunkSize?: number;
+  /** Optional per-source-file byte ceiling checked against canonical streamed input. */
+  maxBytesPerFile?: number;
+  /** Disable adaptive chunk-size fallback after an allocation failure. */
+  strictChunkSize?: boolean;
+}
+
+/** Detached native batch signing options. */
+export interface StreamingBatchSignOptions {
+  /** map writes one .mjksmap file; separate writes one .mjksig sidecar per successful file. */
+  mode?: "map" | "separate";
+  contentType?: string;
+  timestamp?: string;
+  expectedSigners?: SignerRef[];
+  validUntil?: string;
+  continueOnError?: boolean;
+}
+
+/** Request native detached batch signing without materializing source files in the webview. */
+export interface StreamingBatchSignArgs {
+  operationId: string;
+  inputs: StreamingBatchPathInput[];
+  options?: StreamingBatchSignOptions;
+  ctx?: Ctx;
+  streaming?: BatchStreamingFileOptions;
+  /** Required when mode is map (the default). */
+  mapOutputPath?: string;
+  /** Required when mode is separate; the directory must already exist. */
+  outputDir?: string;
+  overwrite?: boolean;
+}
+
+/** Output metadata for one native-path batch result. */
+export interface StreamingBatchOutput {
+  path: string;
+  sizeBytes: number;
+}
+
+/** Result of native detached batch signing. Source-file bytes are never returned over IPC. */
+export interface StreamingBatchSignResult {
+  mode: "map" | "separate";
+  map?: StreamingBatchOutput;
+  signatures: Array<{ manifestPath: string; output: StreamingBatchOutput }>;
+  failures: Failure[];
+}
+
+/**
+ * Request native MJKSMAP verification against explicitly trusted signer material.
+ *
+ * The Rust streaming verifier requires an account, contact or address in target; it does not
+ * use the self-reported keys embedded in the signature envelope.
+ */
+export interface StreamingBatchVerifyArgs {
+  operationId: string;
+  mapPath: string;
+  inputs: StreamingBatchPathInput[];
+  target: VerifyTarget;
+  requireAllPresent?: boolean;
+  source?: HistorySource;
+  streaming?: BatchStreamingFileOptions;
+}
 export interface CosignArgs {
   map: FileInput;
   files: FileInput[];
