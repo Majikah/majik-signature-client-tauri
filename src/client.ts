@@ -124,7 +124,6 @@ const UNSAFE_INPUT_CHARACTERS = /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]
 
 /** Reject oversized or control-bearing strings before IPC serialization. */
 function validateBoundedText(value: string, field: string, maximum: number): void {
-/** Invoke the native if operation. */
   if (value.length > maximum || UNSAFE_INPUT_CHARACTERS.test(value)) {
     throw new TypeError(field + " must be at most " + maximum +
       " UTF-16 code units and contain no control or bidi override characters.");
@@ -133,7 +132,6 @@ function validateBoundedText(value: string, field: string, maximum: number): voi
 
 /** Validate a caller-supplied native path without imposing a filesystem sandbox. */
 function validateNativePath(path: string, field: string): void {
-/** Invoke the native if operation. */
   if (path.trim().length === 0) throw new TypeError(field + " must not be empty.");
 /** Invoke the native validate_bounded_text operation. */
   validateBoundedText(path, field, MAX_NATIVE_PATH_CHARS);
@@ -141,7 +139,6 @@ function validateNativePath(path: string, field: string): void {
 
 /** Keep stream correlation IDs small and safe for the native active-operation registry. */
 function validateOperationId(operationId: string): void {
-/** Invoke the native if operation. */
   if (
     operationId.length === 0 ||
     operationId.length > MAX_STREAM_OPERATION_ID_CHARS ||
@@ -153,7 +150,6 @@ function validateOperationId(operationId: string): void {
 
 function validateStreamingOptions(options?: StreamingFileOptions): void {
   const chunkSize = options?.chunkSize;
-/** Invoke the native if operation. */
   if (
     chunkSize !== undefined &&
     chunkSize !== null &&
@@ -167,7 +163,6 @@ function validateStreamingOptions(options?: StreamingFileOptions): void {
     );
   }
   const maxBytes = options?.maxBytes;
-/** Invoke the native if operation. */
   if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes < 0)) {
     throw new RangeError("maxBytes must be a non-negative safe integer.");
   }
@@ -175,7 +170,6 @@ function validateStreamingOptions(options?: StreamingFileOptions): void {
 
 function validateBatchStreamingOptions(options?: BatchStreamingFileOptions): void {
   const chunkSize = options?.chunkSize;
-/** Invoke the native if operation. */
   if (
     chunkSize !== undefined &&
     (!Number.isSafeInteger(chunkSize) ||
@@ -188,7 +182,6 @@ function validateBatchStreamingOptions(options?: BatchStreamingFileOptions): voi
     );
   }
   const maxBytes = options?.maxBytesPerFile;
-/** Invoke the native if operation. */
   if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes < 0)) {
     throw new RangeError("maxBytesPerFile must be a non-negative safe integer.");
   }
@@ -199,10 +192,8 @@ function normalizeManifestPath(path: string): string {
 /** Invoke the native validate_bounded_text operation. */
   validateBoundedText(path, "manifestPath", MAX_NATIVE_PATH_CHARS);
   let normalized = path.replace(/\\/gu, "/").trim();
-/** Invoke the native if operation. */
   if (/^[A-Za-z]:/u.test(normalized)) normalized = normalized.slice(2);
   normalized = normalized.replace(/^\/+/u, "");
-/** Invoke the native if operation. */
   if (
     normalized.length === 0 ||
     normalized.split("/").some((segment) => segment === "..")
@@ -213,14 +204,12 @@ function normalizeManifestPath(path: string): string {
 }
 
 function validateStreamingBatchInputs(inputs: StreamingBatchPathInput[]): void {
-/** Invoke the native if operation. */
   if (inputs.length === 0 || inputs.length > MAX_BATCH_FILES) {
     throw new RangeError("inputs must contain between 1 and " + MAX_BATCH_FILES + " files.");
   }
   const seen = new Set<string>();
   let metadataBytes = 0;
   const encoder = new TextEncoder();
-/** Invoke the native for operation. */
   for (const input of inputs) {
     const manifestPath = normalizeManifestPath(input.manifestPath);
     validateNativePath(input.sourcePath, "sourcePath");
@@ -240,13 +229,10 @@ function validateStreamingBatchInputs(inputs: StreamingBatchPathInput[]): void {
 }
 
 function validateExpectedSigners(signers?: SignerRef[]): void {
-/** Invoke the native if operation. */
   if (!signers) return;
-/** Invoke the native if operation. */
   if (signers.length > MAX_EXPECTED_SIGNERS) {
     throw new RangeError("expectedSigners cannot exceed " + MAX_EXPECTED_SIGNERS + " entries.");
   }
-/** Invoke the native for operation. */
   for (const signer of signers) {
     if ("contactId" in signer) {
       validateBoundedText(signer.contactId, "expectedSigners.contactId", 256);
@@ -261,20 +247,15 @@ function validateExpectedSigners(signers?: SignerRef[]): void {
 }
 
 function validateSigningMetadata(options?: StreamingBatchSignArgs["options"]): void {
-/** Invoke the native if operation. */
   if (!options) return;
-/** Invoke the native if operation. */
   if (options.contentType !== undefined) validateBoundedText(options.contentType, "contentType", 1_024);
-/** Invoke the native if operation. */
   if (options.timestamp !== undefined) validateBoundedText(options.timestamp, "timestamp", 128);
-/** Invoke the native if operation. */
   if (options.validUntil !== undefined) validateBoundedText(options.validUntil, "validUntil", 128);
 /** Invoke the native validate_expected_signers operation. */
   validateExpectedSigners(options.expectedSigners);
 }
 
 function validateFileInputMetadata(input: FileInput, field: string): void {
-/** Invoke the native if operation. */
   if ("path" in input) {
     validateNativePath(input.path, field);
   } else {
@@ -284,7 +265,6 @@ function validateFileInputMetadata(input: FileInput, field: string): void {
     }
     if (input.name !== undefined) validateBoundedText(input.name, "fileName", MAX_NATIVE_PATH_CHARS);
   }
-/** Invoke the native if operation. */
   if (input.mimeType !== undefined) validateBoundedText(input.mimeType, "mimeType", 1_024);
 }
 
@@ -300,44 +280,29 @@ function validateStreamingSignArgs(
   validateNativePath(args.outputPath, "outputPath");
 /** Invoke the native validate_streaming_options operation. */
   validateStreamingOptions(args.streaming);
-/** Invoke the native if operation. */
   if (priorFilePath !== undefined) validateNativePath(priorFilePath, "priorFilePath");
-/** Invoke the native if operation. */
   if (args.ctx?.accountId !== undefined) validateBoundedText(args.ctx.accountId, "accountId", 256);
 /** Invoke the native validate_expected_signers operation. */
   validateExpectedSigners(args.options?.expectedSigners);
-/** Invoke the native if operation. */
   if (args.options?.contentType !== undefined) validateBoundedText(args.options.contentType, "contentType", 1_024);
-/** Invoke the native if operation. */
   if (args.options?.timestamp !== undefined) validateBoundedText(args.options.timestamp, "timestamp", 128);
-/** Invoke the native if operation. */
   if (args.options?.mimeType !== undefined) validateBoundedText(args.options.mimeType, "mimeType", 1_024);
-/** Invoke the native if operation. */
   if (args.options?.validUntil !== undefined) validateBoundedText(args.options.validUntil, "validUntil", 128);
-/** Invoke the native if operation. */
   if (args.options && "message" in args.options && args.options.message !== undefined) {
     validateBoundedText(args.options.message, "message", 4_096);
   }
-/** Invoke the native if operation. */
   if (args.options && "existingEnvelope" in args.options && args.options.existingEnvelope) {
     validateFileInputMetadata(args.options.existingEnvelope, "existingEnvelope");
   }
 }
 
 function validateVerificationTarget(target?: VerifyTarget, requireTrusted = false): void {
-/** Invoke the native if operation. */
   if (target?.accountId !== undefined) validateBoundedText(target.accountId, "accountId", 256);
-/** Invoke the native if operation. */
   if (target?.contactId !== undefined) validateBoundedText(target.contactId, "contactId", 256);
-/** Invoke the native if operation. */
   if (target?.address !== undefined) validateBoundedText(target.address, "address", 4_096);
-/** Invoke the native if operation. */
   if (target?.expectedSignerId !== undefined) validateBoundedText(target.expectedSignerId, "expectedSignerId", 256);
-/** Invoke the native if operation. */
   if (target?.mimeType !== undefined) validateBoundedText(target.mimeType, "mimeType", 1_024);
-/** Invoke the native if operation. */
   if (target?.now !== undefined) validateBoundedText(target.now, "now", 128);
-/** Invoke the native if operation. */
   if (requireTrusted && !target?.accountId && !target?.contactId && !target?.address) {
     throw new TypeError(
       "Streaming MJKSMAP verification requires a trusted accountId, contactId or address.",
