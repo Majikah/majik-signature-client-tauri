@@ -67,6 +67,7 @@ import type {
   StreamingEmbeddedRevisionArgs,
   StreamingEmbeddedSignArgs,
   StreamingFileOptions,
+  StreamingBatchPathInput,
   SystemProfile,
   RecommendedStreamingConfig,
   StreamingProgressEvent,
