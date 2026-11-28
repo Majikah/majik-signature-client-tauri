@@ -294,10 +294,10 @@ describe("native-path streaming facade", () => {
       streaming: { chunkSize: 64 * 1024 * 1024 },
     });
 
-    await expect(client.verifyFileEmbeddedStream({
+    expect(() => client.verifyFileEmbeddedStream({
       operationId: "path-too-long",
       inputPath: "x".repeat(4_097),
-    })).rejects.toThrow();
+    })).toThrow();
 
     expect(transport.count("sign_file_embedded_stream")).toBe(1);
     expect(transport.count("verify_file_embedded_stream")).toBe(0);
