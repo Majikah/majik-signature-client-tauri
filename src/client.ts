@@ -12,6 +12,10 @@ import type {
   BatchDetached,
   BatchDetachedArgs,
   BatchSignFilesArgs,
+  BatchStreamingFileOptions,
+  StreamingBatchSignArgs,
+  StreamingBatchSignResult,
+  StreamingBatchVerifyArgs,
   BatchSignOutcome,
   BytesOutput,
   Cosign,
@@ -85,8 +89,11 @@ import type {
   VerifyTextArgs,
 } from "./types.js";
 
+/** Registered Tauri plugin name used by command invocations. */
 export const SIGNATURE_PLUGIN = "majik-signature-client";
+/** Combined key-client and signature-client state event channel. */
 export const SIGNATURE_EVENT_CHANNEL = "majik-signature-client:event";
+/** Dedicated progress channel; events do not refresh the signature read-model. */
 export const SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL =
   "majik-signature-client:stream-progress";
 
@@ -98,6 +105,197 @@ function compact(obj: Record<string, unknown>): Record<string, unknown> {
     Object.entries(obj).filter(([, v]) => v !== undefined),
   );
 }
+
+
+const MIN_STREAM_CHUNK_SIZE = 64 * 1024;
+const MAX_STREAM_CHUNK_SIZE = 64 * 1024 * 1024;
+const MAX_STREAM_OPERATION_ID_CHARS = 128;
+const MAX_NATIVE_PATH_CHARS = 4_096;
+const MAX_BATCH_FILES = 10_000;
+const MAX_BATCH_METADATA_BYTES = 8 * 1024 * 1024;
+const MAX_EXPECTED_SIGNERS = 1_000;
+const UNSAFE_INPUT_CHARACTERS = /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/u;
+
+/** Reject oversized or control-bearing strings before IPC serialization. */
+function validateBoundedText(value: string, field: string, maximum: number): void {
+  if (value.length > maximum || UNSAFE_INPUT_CHARACTERS.test(value)) {
+    throw new TypeError(field + " must be at most " + maximum +
+      " UTF-16 code units and contain no control or bidi override characters.");
+  }
+}
+
+/** Validate a caller-supplied native path without imposing a filesystem sandbox. */
+function validateNativePath(path: string, field: string): void {
+  if (path.trim().length === 0) throw new TypeError(field + " must not be empty.");
+  validateBoundedText(path, field, MAX_NATIVE_PATH_CHARS);
+}
+
+/** Keep stream correlation IDs small and safe for the native active-operation registry. */
+function validateOperationId(operationId: string): void {
+  if (
+    operationId.length === 0 ||
+    operationId.length > MAX_STREAM_OPERATION_ID_CHARS ||
+    !/^[A-Za-z0-9._:-]+$/u.test(operationId)
+  ) {
+    throw new TypeError("operationId must contain 1–128 restricted ASCII characters.");
+  }
+}
+
+function validateStreamingOptions(options?: StreamingFileOptions): void {
+  const chunkSize = options?.chunkSize;
+  if (
+    chunkSize !== undefined &&
+    chunkSize !== null &&
+    (!Number.isSafeInteger(chunkSize) ||
+      chunkSize < MIN_STREAM_CHUNK_SIZE ||
+      chunkSize > MAX_STREAM_CHUNK_SIZE)
+  ) {
+    throw new RangeError(
+      "chunkSize must be between " + MIN_STREAM_CHUNK_SIZE + " and " +
+      MAX_STREAM_CHUNK_SIZE + " bytes.",
+    );
+  }
+  const maxBytes = options?.maxBytes;
+  if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes < 0)) {
+    throw new RangeError("maxBytes must be a non-negative safe integer.");
+  }
+}
+
+function validateBatchStreamingOptions(options?: BatchStreamingFileOptions): void {
+  const chunkSize = options?.chunkSize;
+  if (
+    chunkSize !== undefined &&
+    (!Number.isSafeInteger(chunkSize) ||
+      chunkSize < MIN_STREAM_CHUNK_SIZE ||
+      chunkSize > MAX_STREAM_CHUNK_SIZE)
+  ) {
+    throw new RangeError(
+      "chunkSize must be between " + MIN_STREAM_CHUNK_SIZE + " and " +
+      MAX_STREAM_CHUNK_SIZE + " bytes.",
+    );
+  }
+  const maxBytes = options?.maxBytesPerFile;
+  if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes < 0)) {
+    throw new RangeError("maxBytesPerFile must be a non-negative safe integer.");
+  }
+}
+
+/** Mirror the core manifest alias rules before checking duplicate entries. */
+function normalizeManifestPath(path: string): string {
+  validateBoundedText(path, "manifestPath", MAX_NATIVE_PATH_CHARS);
+  let normalized = path.replace(/\\/gu, "/").trim();
+  if (/^[A-Za-z]:/u.test(normalized)) normalized = normalized.slice(2);
+  normalized = normalized.replace(/^\/+/u, "");
+  if (
+    normalized.length === 0 ||
+    normalized.split("/").some((segment) => segment === "..")
+  ) {
+    throw new TypeError("manifestPath must normalize to a non-traversing relative path.");
+  }
+  return normalized;
+}
+
+function validateStreamingBatchInputs(inputs: StreamingBatchPathInput[]): void {
+  if (inputs.length === 0 || inputs.length > MAX_BATCH_FILES) {
+    throw new RangeError("inputs must contain between 1 and " + MAX_BATCH_FILES + " files.");
+  }
+  const seen = new Set<string>();
+  let metadataBytes = 0;
+  const encoder = new TextEncoder();
+  for (const input of inputs) {
+    const manifestPath = normalizeManifestPath(input.manifestPath);
+    validateNativePath(input.sourcePath, "sourcePath");
+    if (input.mimeType !== undefined) validateBoundedText(input.mimeType, "mimeType", 1_024);
+    if (seen.has(manifestPath)) {
+      throw new TypeError("Duplicate manifestPath after normalization: " + manifestPath);
+    }
+    seen.add(manifestPath);
+    metadataBytes +=
+      encoder.encode(input.manifestPath).byteLength +
+      encoder.encode(input.sourcePath).byteLength +
+      (input.mimeType === undefined ? 0 : encoder.encode(input.mimeType).byteLength);
+    if (metadataBytes > MAX_BATCH_METADATA_BYTES) {
+      throw new RangeError("Batch path and MIME metadata exceeds the 8 MiB request limit.");
+    }
+  }
+}
+
+function validateExpectedSigners(signers?: SignerRef[]): void {
+  if (!signers) return;
+  if (signers.length > MAX_EXPECTED_SIGNERS) {
+    throw new RangeError("expectedSigners cannot exceed " + MAX_EXPECTED_SIGNERS + " entries.");
+  }
+  for (const signer of signers) {
+    if ("contactId" in signer) {
+      validateBoundedText(signer.contactId, "expectedSigners.contactId", 256);
+    } else if ("accountId" in signer) {
+      validateBoundedText(signer.accountId, "expectedSigners.accountId", 256);
+    } else {
+      validateBoundedText(signer.signerId, "expectedSigners.signerId", 256);
+      validateBoundedText(signer.edPublicKey, "expectedSigners.edPublicKey", 1_024);
+      validateBoundedText(signer.mlDsaPublicKey, "expectedSigners.mlDsaPublicKey", 8_192);
+    }
+  }
+}
+
+function validateSigningMetadata(options?: StreamingBatchSignArgs["options"]): void {
+  if (!options) return;
+  if (options.contentType !== undefined) validateBoundedText(options.contentType, "contentType", 1_024);
+  if (options.timestamp !== undefined) validateBoundedText(options.timestamp, "timestamp", 128);
+  if (options.validUntil !== undefined) validateBoundedText(options.validUntil, "validUntil", 128);
+  validateExpectedSigners(options.expectedSigners);
+}
+
+function validateFileInputMetadata(input: FileInput, field: string): void {
+  if ("path" in input) {
+    validateNativePath(input.path, field);
+  } else {
+    const maximumEncodedLength = Math.ceil((16 * 1024 * 1024) / 3) * 4;
+    if (input.data.trim().length > maximumEncodedLength) {
+      throw new RangeError(field + " exceeds the 16 MiB inline envelope limit.");
+    }
+    if (input.name !== undefined) validateBoundedText(input.name, "fileName", MAX_NATIVE_PATH_CHARS);
+  }
+  if (input.mimeType !== undefined) validateBoundedText(input.mimeType, "mimeType", 1_024);
+}
+
+function validateStreamingSignArgs(
+  args: StreamingEmbeddedSignArgs | StreamingDetachedSignArgs,
+  priorFilePath?: string,
+): void {
+  validateOperationId(args.operationId);
+  validateNativePath(args.inputPath, "inputPath");
+  validateNativePath(args.outputPath, "outputPath");
+  validateStreamingOptions(args.streaming);
+  if (priorFilePath !== undefined) validateNativePath(priorFilePath, "priorFilePath");
+  if (args.ctx?.accountId !== undefined) validateBoundedText(args.ctx.accountId, "accountId", 256);
+  validateExpectedSigners(args.options?.expectedSigners);
+  if (args.options?.contentType !== undefined) validateBoundedText(args.options.contentType, "contentType", 1_024);
+  if (args.options?.timestamp !== undefined) validateBoundedText(args.options.timestamp, "timestamp", 128);
+  if (args.options?.mimeType !== undefined) validateBoundedText(args.options.mimeType, "mimeType", 1_024);
+  if (args.options?.validUntil !== undefined) validateBoundedText(args.options.validUntil, "validUntil", 128);
+  if (args.options && "message" in args.options && args.options.message !== undefined) {
+    validateBoundedText(args.options.message, "message", 4_096);
+  }
+  if (args.options && "existingEnvelope" in args.options && args.options.existingEnvelope) {
+    validateFileInputMetadata(args.options.existingEnvelope, "existingEnvelope");
+  }
+}
+
+function validateVerificationTarget(target?: VerifyTarget, requireTrusted = false): void {
+  if (target?.accountId !== undefined) validateBoundedText(target.accountId, "accountId", 256);
+  if (target?.contactId !== undefined) validateBoundedText(target.contactId, "contactId", 256);
+  if (target?.address !== undefined) validateBoundedText(target.address, "address", 4_096);
+  if (target?.expectedSignerId !== undefined) validateBoundedText(target.expectedSignerId, "expectedSignerId", 256);
+  if (target?.mimeType !== undefined) validateBoundedText(target.mimeType, "mimeType", 1_024);
+  if (target?.now !== undefined) validateBoundedText(target.now, "now", 128);
+  if (requireTrusted && !target?.accountId && !target?.contactId && !target?.address) {
+    throw new TypeError(
+      "Streaming MJKSMAP verification requires a trusted accountId, contactId or address.",
+    );
+  }
+}
+
 
 type AnyOn = (type: string, listener: (payload: unknown) => void) => () => void;
 
@@ -635,6 +833,7 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   signFileEmbeddedStream(
     args: StreamingEmbeddedSignArgs,
   ): Promise<StreamingSignResult> {
+    validateStreamingSignArgs(args);
     return this.invoke<StreamingSignResult>(
       "sign_file_embedded_stream",
       compact({ args }),
@@ -645,6 +844,7 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   signFileDetachedStream(
     args: StreamingDetachedSignArgs,
   ): Promise<StreamingSignResult> {
+    validateStreamingSignArgs(args);
     return this.invoke<StreamingSignResult>(
       "sign_file_detached_stream",
       compact({ args }),
@@ -655,6 +855,7 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   signFileEmbeddedStreamWithPrior(
     args: StreamingEmbeddedRevisionArgs,
   ): Promise<StreamingSignResult> {
+    validateStreamingSignArgs(args, args.priorFilePath);
     return this.invoke<StreamingSignResult>(
       "sign_file_embedded_stream_with_prior",
       compact({ args }),
@@ -665,6 +866,7 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   signFileDetachedStreamWithPrior(
     args: StreamingDetachedRevisionArgs,
   ): Promise<StreamingSignResult> {
+    validateStreamingSignArgs(args, args.priorFilePath);
     return this.invoke<StreamingSignResult>(
       "sign_file_detached_stream_with_prior",
       compact({ args }),
@@ -673,6 +875,10 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
 
   /** Verify an embedded signature directly from a native file path. */
   verifyFileEmbeddedStream(args: StreamingVerifyArgs): Promise<VerifyResult> {
+    validateOperationId(args.operationId);
+    validateNativePath(args.inputPath, "inputPath");
+    validateStreamingOptions(args.streaming);
+    validateVerificationTarget(args.target);
     return this.invoke<VerifyResult>(
       "verify_file_embedded_stream",
       compact({ args }),
@@ -683,8 +889,64 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
   verifyFileDetachedStream(
     args: StreamingDetachedVerifyArgs,
   ): Promise<VerifyResult> {
+    validateOperationId(args.operationId);
+    validateNativePath(args.inputPath, "inputPath");
+    validateNativePath(args.envelopePath, "envelopePath");
+    validateStreamingOptions(args.streaming);
+    validateVerificationTarget(args.target);
     return this.invoke<VerifyResult>(
       "verify_file_detached_stream",
+      compact({ args }),
+    );
+  }
+
+
+  /**
+   * Sign native paths as one MJKSMAP or a set of detached sidecars.
+   *
+   * Input metadata is validated before IPC; the Rust client opens and streams each source file.
+   */
+  signBatchDetachedPathsStream(
+    args: StreamingBatchSignArgs,
+  ): Promise<StreamingBatchSignResult> {
+    validateOperationId(args.operationId);
+    validateStreamingBatchInputs(args.inputs);
+    validateBatchStreamingOptions(args.streaming);
+    validateSigningMetadata(args.options);
+    if (args.ctx?.accountId !== undefined) validateBoundedText(args.ctx.accountId, "accountId", 256);
+
+    switch (args.options?.mode ?? "map") {
+      case "map":
+        validateNativePath(args.mapOutputPath ?? "", "mapOutputPath");
+        break;
+      case "separate":
+        validateNativePath(args.outputDir ?? "", "outputDir");
+        break;
+      default:
+        throw new TypeError("options.mode must be 'map' or 'separate'.");
+    }
+
+    return this.invoke<StreamingBatchSignResult>(
+      "sign_batch_detached_paths_stream",
+      compact({ args }),
+    );
+  }
+
+  /**
+   * Verify native file paths against an MJKSMAP using a trusted signer key.
+   *
+   * The Rust verifier requires an account, contact or address; it does not use self-reported keys.
+   */
+  verifyMjksMapPathsStream(
+    args: StreamingBatchVerifyArgs,
+  ): Promise<MapVerify> {
+    validateOperationId(args.operationId);
+    validateNativePath(args.mapPath, "mapPath");
+    validateStreamingBatchInputs(args.inputs);
+    validateBatchStreamingOptions(args.streaming);
+    validateVerificationTarget(args.target, true);
+    return this.invoke<MapVerify>(
+      "verify_mjks_map_paths_stream",
       compact({ args }),
     );
   }
@@ -701,6 +963,7 @@ export class MajikSignatureClientTauri extends MajikKeyClientTauri {
 
   /** Request cancellation; resolves true only when the operation ID was active. */
   cancelStream(operationId: string): Promise<boolean> {
+    validateOperationId(operationId);
     return this.invoke<boolean>("cancel_stream", compact({ operationId }));
   }
 
