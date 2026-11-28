@@ -171,4 +171,138 @@ describe("native-path streaming facade", () => {
     expect(transport.activeListeners(SIGNATURE_STREAM_PROGRESS_EVENT_CHANNEL)).toBe(0);
     expect(transport.activeListeners(SIGNATURE_EVENT_CHANNEL)).toBe(0);
   });
+
+  it("maps native streaming batch sign and trusted MJKSMAP verify to Rust IPC commands", async () => {
+    const transport = new FakeTransport();
+    const client = await MajikSignatureClientTauri.open({ transport });
+    const inputs = [
+      { manifestPath: "contracts/nda.pdf", sourcePath: "/data/contracts/nda.pdf" },
+      { manifestPath: "media/demo.mov", sourcePath: "/data/media/demo.mov" },
+    ];
+
+    await client.signBatchDetachedPathsStream({
+      operationId: "batch-sign-1",
+      inputs,
+      mapOutputPath: "/data/output/contracts.mjksmap",
+      options: { mode: "map", continueOnError: true },
+      streaming: { chunkSize: 4 * 1024 * 1024, maxBytesPerFile: 10 * 1024 * 1024 * 1024 },
+    });
+    await client.verifyMjksMapPathsStream({
+      operationId: "batch-verify-1",
+      mapPath: "/data/output/contracts.mjksmap",
+      inputs,
+      target: { accountId: "local-account" },
+      streaming: { chunkSize: 2 * 1024 * 1024 },
+    });
+
+    expect(transport.calls.filter((call) => call.command !== "open_session")).toEqual([
+      {
+        command: "sign_batch_detached_paths_stream",
+        args: {
+          args: {
+            operationId: "batch-sign-1",
+            inputs,
+            mapOutputPath: "/data/output/contracts.mjksmap",
+            options: { mode: "map", continueOnError: true },
+            streaming: { chunkSize: 4 * 1024 * 1024, maxBytesPerFile: 10 * 1024 * 1024 * 1024 },
+          },
+        },
+      },
+      {
+        command: "verify_mjks_map_paths_stream",
+        args: {
+          args: {
+            operationId: "batch-verify-1",
+            mapPath: "/data/output/contracts.mjksmap",
+            inputs,
+            target: { accountId: "local-account" },
+            streaming: { chunkSize: 2 * 1024 * 1024 },
+          },
+        },
+      },
+    ]);
+    await client.dispose();
+  });
+
+  it("rejects malicious and excessive native streaming input before IPC", async () => {
+    const transport = new FakeTransport();
+    const client = await MajikSignatureClientTauri.open({ transport });
+    const callsAfterOpen = transport.calls.length;
+
+    expect(() => client.signFileEmbeddedStream({
+      operationId: "bad\nid",
+      inputPath: "/tmp/source.pdf",
+      outputPath: "/tmp/signed.pdf",
+    })).toThrow();
+
+    expect(() => client.signFileEmbeddedStream({
+      operationId: "chunk-too-large",
+      inputPath: "/tmp/source.pdf",
+      outputPath: "/tmp/signed.pdf",
+      streaming: { chunkSize: 64 * 1024 * 1024 + 1 },
+    })).toThrow();
+
+    expect(() => client.signBatchDetachedPathsStream({
+      operationId: "path-traversal",
+      inputs: [{ manifestPath: "safe/../escape.pdf", sourcePath: "/tmp/source.pdf" }],
+      mapOutputPath: "/tmp/map.mjksmap",
+    })).toThrow();
+
+    expect(() => client.signBatchDetachedPathsStream({
+      operationId: "duplicate-alias",
+      inputs: [
+        { manifestPath: "folder/file.pdf", sourcePath: "/tmp/a.pdf" },
+        { manifestPath: "folder\\file.pdf", sourcePath: "/tmp/b.pdf" },
+      ],
+      mapOutputPath: "/tmp/map.mjksmap",
+    })).toThrow();
+
+    expect(() => client.signBatchDetachedPathsStream({
+      operationId: "too-many",
+      inputs: Array.from({ length: 10_001 }, (_, index) => ({
+        manifestPath: "file-" + index + ".pdf",
+        sourcePath: "/tmp/file-" + index + ".pdf",
+      })),
+      mapOutputPath: "/tmp/map.mjksmap",
+    })).toThrow();
+
+    expect(() => client.verifyMjksMapPathsStream({
+      operationId: "untrusted-key",
+      mapPath: "/tmp/map.mjksmap",
+      inputs: [{ manifestPath: "file.pdf", sourcePath: "/tmp/file.pdf" }],
+      target: { expectedSignerId: "self-reported-only" },
+    })).toThrow();
+
+    expect(() => client.signBatchDetachedPathsStream({
+      operationId: "bidi-path",
+      inputs: [{ manifestPath: "file\u202e.pdf", sourcePath: "/tmp/file.pdf" }],
+      mapOutputPath: "/tmp/map.mjksmap",
+    })).toThrow();
+
+    expect(transport.calls).toHaveLength(callsAfterOpen);
+    await client.dispose();
+  });
+
+  it("accepts the maximum native streaming chunk size and rejects overlong source paths locally", async () => {
+    const transport = new FakeTransport();
+    const client = await MajikSignatureClientTauri.open({ transport });
+
+    await client.signFileEmbeddedStream({
+      operationId: "chunk-max",
+      inputPath: "/tmp/source.pdf",
+      outputPath: "/tmp/signed.pdf",
+      streaming: { chunkSize: 64 * 1024 * 1024 },
+    });
+
+    expect(() => client.verifyFileEmbeddedStream({
+      operationId: "path-too-long",
+      inputPath: "x".repeat(4_097),
+    })).toThrow();
+
+    expect(transport.count("sign_file_embedded_stream")).toBe(1);
+    expect(transport.count("verify_file_embedded_stream")).toBe(0);
+    await client.dispose();
+  });
+
+
 });
