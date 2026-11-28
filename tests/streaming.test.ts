@@ -229,55 +229,55 @@ describe("native-path streaming facade", () => {
     const client = await MajikSignatureClientTauri.open({ transport });
     const callsAfterOpen = transport.calls.length;
 
-    await expect(client.signFileEmbeddedStream({
+    expect(() => client.signFileEmbeddedStream({
       operationId: "bad\nid",
       inputPath: "/tmp/source.pdf",
       outputPath: "/tmp/signed.pdf",
-    })).rejects.toThrow();
+    })).toThrow();
 
-    await expect(client.signFileEmbeddedStream({
+    expect(() => client.signFileEmbeddedStream({
       operationId: "chunk-too-large",
       inputPath: "/tmp/source.pdf",
       outputPath: "/tmp/signed.pdf",
       streaming: { chunkSize: 64 * 1024 * 1024 + 1 },
-    })).rejects.toThrow();
+    })).toThrow();
 
-    await expect(client.signBatchDetachedPathsStream({
+    expect(() => client.signBatchDetachedPathsStream({
       operationId: "path-traversal",
       inputs: [{ manifestPath: "safe/../escape.pdf", sourcePath: "/tmp/source.pdf" }],
       mapOutputPath: "/tmp/map.mjksmap",
-    })).rejects.toThrow();
+    })).toThrow();
 
-    await expect(client.signBatchDetachedPathsStream({
+    expect(() => client.signBatchDetachedPathsStream({
       operationId: "duplicate-alias",
       inputs: [
         { manifestPath: "folder/file.pdf", sourcePath: "/tmp/a.pdf" },
-        { manifestPath: "folder\\\\file.pdf", sourcePath: "/tmp/b.pdf" },
+        { manifestPath: "folder\\file.pdf", sourcePath: "/tmp/b.pdf" },
       ],
       mapOutputPath: "/tmp/map.mjksmap",
-    })).rejects.toThrow();
+    })).toThrow();
 
-    await expect(client.signBatchDetachedPathsStream({
+    expect(() => client.signBatchDetachedPathsStream({
       operationId: "too-many",
       inputs: Array.from({ length: 10_001 }, (_, index) => ({
         manifestPath: "file-" + index + ".pdf",
         sourcePath: "/tmp/file-" + index + ".pdf",
       })),
       mapOutputPath: "/tmp/map.mjksmap",
-    })).rejects.toThrow();
+    })).toThrow();
 
-    await expect(client.verifyMjksMapPathsStream({
+    expect(() => client.verifyMjksMapPathsStream({
       operationId: "untrusted-key",
       mapPath: "/tmp/map.mjksmap",
       inputs: [{ manifestPath: "file.pdf", sourcePath: "/tmp/file.pdf" }],
       target: { expectedSignerId: "self-reported-only" },
-    })).rejects.toThrow();
+    })).toThrow();
 
-    await expect(client.signBatchDetachedPathsStream({
+    expect(() => client.signBatchDetachedPathsStream({
       operationId: "bidi-path",
-      inputs: [{ manifestPath: "file\\u202e.pdf", sourcePath: "/tmp/file.pdf" }],
+      inputs: [{ manifestPath: "file\u202e.pdf", sourcePath: "/tmp/file.pdf" }],
       mapOutputPath: "/tmp/map.mjksmap",
-    })).rejects.toThrow();
+    })).toThrow();
 
     expect(transport.calls).toHaveLength(callsAfterOpen);
     await client.dispose();
