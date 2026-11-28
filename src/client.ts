@@ -72,7 +72,6 @@ import type {
   StreamingEmbeddedRevisionArgs,
   StreamingEmbeddedSignArgs,
   StreamingFileOptions,
-  StreamingBatchPathInput,
   SystemProfile,
   RecommendedStreamingConfig,
   StreamingProgressEvent,
@@ -92,6 +91,7 @@ import type {
   VerifyFileArgs,
   VerifyMapArgs,
   VerifyResult,
+  VerifyTarget,
   VerifyTextArgs,
 } from "./types.js";
 
