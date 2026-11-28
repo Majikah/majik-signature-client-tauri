@@ -12,6 +12,7 @@ import type {
 
 export type { MajikContactMeta, MajikKeyJson, SerializedMajikContact };
 
+/** Public TypeScript wire shape for Json in the signature-client facade. */
 export type Json = { [key: string]: unknown };
 
 // ─── Files ───────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ export interface OutputTarget {
   overwrite?: boolean;
 }
 
+/** Public TypeScript wire shape for BytesOutput in the signature-client facade. */
 export interface BytesOutput {
   size: number;
   /** Set when the result was written to disk. */
@@ -41,14 +43,17 @@ export interface BytesOutput {
 
 // ─── Shared args ─────────────────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for HistorySource in the signature-client facade. */
 export type HistorySource = "gui" | "cli" | "mcp" | "api" | "sdk" | "system";
 
+/** Public TypeScript wire shape for Ctx in the signature-client facade. */
 export interface Ctx {
   /** Defaults to the active account. */
   accountId?: string;
   source?: HistorySource;
 }
 
+/** Public TypeScript wire shape for VerifyTarget in the signature-client facade. */
 export interface VerifyTarget {
   contactId?: string;
   /** Base64 X25519 public key of a known contact. */
@@ -61,12 +66,14 @@ export interface VerifyTarget {
   now?: string;
 }
 
+/** Public TypeScript wire shape for ExpectedSigner in the signature-client facade. */
 export interface ExpectedSigner {
   signerId: string;
   edPublicKey: string;
   mlDsaPublicKey: string;
 }
 
+/** Public TypeScript wire shape for SignerRef in the signature-client facade. */
 export type SignerRef =
   | { contactId: string }
   | { accountId: string }
@@ -74,6 +81,7 @@ export type SignerRef =
 
 // ─── Signatures & verification ───────────────────────────────────────────────
 
+/** Public TypeScript wire shape for MajikSignatureJSON in the signature-client facade. */
 export interface MajikSignatureJSON extends Json {
   signerId: string;
   contentHash: string;
@@ -81,6 +89,7 @@ export interface MajikSignatureJSON extends Json {
   contentType?: string | null;
 }
 
+/** Public TypeScript wire shape for VerificationResult in the signature-client facade. */
 export interface VerificationResult extends Json {
   valid: boolean;
   signerId?: string | null;
@@ -90,22 +99,28 @@ export interface VerificationResult extends Json {
   reason?: string | null;
 }
 
+/** Public TypeScript wire shape for VerifyResult in the signature-client facade. */
 export interface VerifyResult extends VerificationResult {
   signerLabel?: string;
 }
 
+/** Public TypeScript wire shape for MajikTimestamp in the signature-client facade. */
 export interface MajikTimestamp extends Json {}
+/** Public TypeScript wire shape for MajikTsaRequest in the signature-client facade. */
 export interface MajikTsaRequest extends Json {}
+/** Public TypeScript wire shape for MajikChainAnchor in the signature-client facade. */
 export interface MajikChainAnchor extends Json {
   status?: string;
 }
 
+/** Public TypeScript wire shape for SignTextOptions in the signature-client facade. */
 export interface SignTextOptions {
   contentType?: string;
   timestamp?: string;
   validUntil?: string;
 }
 
+/** Public TypeScript wire shape for SignTextResult in the signature-client facade. */
 export interface SignTextResult {
   signature: MajikSignatureJSON;
   /** Base64 `serialize()` form, ready to store or send. */
@@ -116,6 +131,7 @@ export interface SignTextResult {
   contentType: string | null;
 }
 
+/** Public TypeScript wire shape for SignatureMetadata in the signature-client facade. */
 export interface SignatureMetadata {
   signerId: string;
   contentHash: string;
@@ -126,6 +142,7 @@ export interface SignatureMetadata {
   hasTsa: boolean;
 }
 
+/** Public TypeScript wire shape for VerifyTextArgs in the signature-client facade. */
 export interface VerifyTextArgs {
   text: string;
   /** Base64 `serialize()` output or a JSON string. */
@@ -136,6 +153,7 @@ export interface VerifyTextArgs {
 
 // ─── File signing ────────────────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for SignFileOptions in the signature-client facade. */
 export interface SignFileOptions {
   contentType?: string;
   timestamp?: string;
@@ -148,6 +166,7 @@ export interface SignFileOptions {
   saveHistory?: boolean;
 }
 
+/** Public TypeScript wire shape for SignDetachedOptions in the signature-client facade. */
 export interface SignDetachedOptions {
   contentType?: string;
   timestamp?: string;
@@ -160,6 +179,7 @@ export interface SignDetachedOptions {
   saveHistory?: boolean;
 }
 
+/** Public TypeScript wire shape for SignFileArgs in the signature-client facade. */
 export interface SignFileArgs {
   input: FileInput;
   output?: OutputTarget;
@@ -167,6 +187,7 @@ export interface SignFileArgs {
   ctx?: Ctx;
 }
 
+/** Public TypeScript wire shape for SignDetachedArgs in the signature-client facade. */
 export interface SignDetachedArgs {
   input: FileInput;
   /** The `.mjksig` envelope. */
@@ -194,6 +215,7 @@ export interface FileVersion {
   message?: string;
 }
 
+/** Public TypeScript wire shape for SignSessionFileOptions in the signature-client facade. */
 export interface SignSessionFileOptions {
   sessionContext: SessionSigningContext;
   contentType?: string;
@@ -207,12 +229,14 @@ export interface SignSessionFileOptions {
   message?: string;
 }
 
+/** Public TypeScript wire shape for SignSessionFileArgs in the signature-client facade. */
 export interface SignSessionFileArgs {
   input: FileInput;
   options: SignSessionFileOptions;
   ctx?: Ctx;
 }
 
+/** Public TypeScript wire shape for SessionSigned in the signature-client facade. */
 export interface SessionSigned {
   signature: MajikSignatureJSON;
   handler: string;
@@ -220,18 +244,21 @@ export interface SessionSigned {
 }
 
  
+/** Public TypeScript wire shape for SignRoomPublicEncryptionIdentity in the signature-client facade. */
 export interface SignRoomPublicEncryptionIdentity {
   fingerprint: string;
   publicKey: string;
   mlKemPublicKey: string;
 }
 
+/** Public TypeScript wire shape for SignRoomPublicRecipient in the signature-client facade. */
 export interface SignRoomPublicRecipient {
   fingerprint: string;
   publicKey: string;
   mlKemPublicKey: string;
 }
 
+/** Public TypeScript wire shape for EncryptSignRoomFileArgs in the signature-client facade. */
 export interface EncryptSignRoomFileArgs {
   input: FileInput;
   owner: SignRoomPublicEncryptionIdentity;
@@ -239,6 +266,7 @@ export interface EncryptSignRoomFileArgs {
   output?: OutputTarget;
 }
 
+/** Public TypeScript wire shape for EncryptSignRoomFileResult in the signature-client facade. */
 export interface EncryptSignRoomFileResult {
   file: BytesOutput;
   contentHash: string;
@@ -247,6 +275,7 @@ export interface EncryptSignRoomFileResult {
   sizeBytes: number;
 }
 
+/** Public TypeScript wire shape for DecryptSignRoomFileArgs in the signature-client facade. */
 export interface DecryptSignRoomFileArgs {
   input: FileInput;
   accountId: string;
@@ -257,6 +286,7 @@ export interface DecryptSignRoomFileArgs {
   output?: OutputTarget;
 }
 
+/** Public TypeScript wire shape for DecryptSignRoomFileResult in the signature-client facade. */
 export interface DecryptSignRoomFileResult {
   file: BytesOutput;
   originalName: string;
@@ -265,6 +295,7 @@ export interface DecryptSignRoomFileResult {
   contentHash: string;
 }
 
+/** Public TypeScript wire shape for ResignArgs in the signature-client facade. */
 export interface ResignArgs {
   previousSignedFile: FileInput;
   newFile: FileInput;
@@ -273,6 +304,7 @@ export interface ResignArgs {
   ctx?: Ctx;
 }
 
+/** Public TypeScript wire shape for BatchSignFilesArgs in the signature-client facade. */
 export interface BatchSignFilesArgs {
   inputs: FileInput[];
   /** Folder that receives `<name>` for every signed file. */
@@ -282,6 +314,7 @@ export interface BatchSignFilesArgs {
   ctx?: Ctx;
 }
 
+/** Public TypeScript wire shape for SignedFile in the signature-client facade. */
 export interface SignedFile {
   file: BytesOutput;
   signature: MajikSignatureJSON;
@@ -289,6 +322,7 @@ export interface SignedFile {
   mimeType: string;
 }
 
+/** Public TypeScript wire shape for DetachedSigned in the signature-client facade. */
 export interface DetachedSigned {
   envelope: BytesOutput;
   stripped?: BytesOutput;
@@ -297,6 +331,7 @@ export interface DetachedSigned {
   mimeType: string;
 }
 
+/** Public TypeScript wire shape for BatchSignOutcome in the signature-client facade. */
 export interface BatchSignOutcome {
   name: string;
   ok: boolean;
@@ -304,6 +339,7 @@ export interface BatchSignOutcome {
   error?: string;
 }
 
+/** Public TypeScript wire shape for TsaBegin in the signature-client facade. */
 export interface TsaBegin {
   /** Hand back to `completeSignFile*WithTsa` together with the TSA's timestamp. */
   token: string;
@@ -313,12 +349,14 @@ export interface TsaBegin {
 
 // ─── Verify args & results ───────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for VerifyFileArgs in the signature-client facade. */
 export interface VerifyFileArgs {
   input: FileInput;
   target?: VerifyTarget;
   source?: HistorySource;
 }
 
+/** Public TypeScript wire shape for VerifyDetachedArgs in the signature-client facade. */
 export interface VerifyDetachedArgs {
   input: FileInput;
   envelope: FileInput;
@@ -446,12 +484,14 @@ export interface StreamingProgressEvent {
   payload: StreamingProgressPayload;
 }
 
+/** Public TypeScript wire shape for FileChain in the signature-client facade. */
 export interface FileChain {
   latest: VerificationResult;
   history: Json[];
   chainValid: boolean;
 }
 
+/** Public TypeScript wire shape for RevisionSet in the signature-client facade. */
 export interface RevisionSet {
   allValid: boolean;
   isCompleteSet: boolean;
@@ -463,11 +503,13 @@ export interface RevisionSet {
   }>;
 }
 
+/** Public TypeScript wire shape for Permit in the signature-client facade. */
 export interface Permit {
   permitted: boolean;
   reason: string | null;
 }
 
+/** Public TypeScript wire shape for FileSignatureInfo in the signature-client facade. */
 export interface FileSignatureInfo {
   isSigned: boolean;
   signatures: Array<{
@@ -481,6 +523,7 @@ export interface FileSignatureInfo {
   envelope: Json | null;
 }
 
+/** Public TypeScript wire shape for SealedFile in the signature-client facade. */
 export interface SealedFile {
   file: BytesOutput;
   sealInfo: Json;
@@ -488,10 +531,12 @@ export interface SealedFile {
   mimeType: string;
 }
 
+/** Public TypeScript wire shape for SignatoriesFilter in the signature-client facade. */
 export type SignatoriesFilter = "signed" | "pending" | "all";
 
 // ─── Maps, batches, order ────────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for BatchDetachedOptions in the signature-client facade. */
 export interface BatchDetachedOptions {
   mode?: "map" | "separate";
   contentType?: string;
@@ -501,6 +546,7 @@ export interface BatchDetachedOptions {
   continueOnError?: boolean;
 }
 
+/** Public TypeScript wire shape for BatchDetachedArgs in the signature-client facade. */
 export interface BatchDetachedArgs {
   inputs: FileInput[];
   /** Map mode: where the `.mjksmap` goes. */
@@ -512,11 +558,13 @@ export interface BatchDetachedArgs {
   ctx?: Ctx;
 }
 
+/** Public TypeScript wire shape for Failure in the signature-client facade. */
 export interface Failure {
   path: string;
   error: string;
 }
 
+/** Public TypeScript wire shape for BatchDetached in the signature-client facade. */
 export interface BatchDetached {
   map?: BytesOutput;
   signatures: Array<{ path: string; output: BytesOutput }>;
@@ -597,6 +645,7 @@ export interface StreamingBatchVerifyArgs {
   source?: HistorySource;
   streaming?: BatchStreamingFileOptions;
 }
+/** Public TypeScript wire shape for CosignArgs in the signature-client facade. */
 export interface CosignArgs {
   map: FileInput;
   files: FileInput[];
@@ -606,11 +655,13 @@ export interface CosignArgs {
   ctx?: Ctx;
 }
 
+/** Public TypeScript wire shape for Cosign in the signature-client facade. */
 export interface Cosign {
   map: BytesOutput;
   failures: Failure[];
 }
 
+/** Public TypeScript wire shape for VerifyMapArgs in the signature-client facade. */
 export interface VerifyMapArgs {
   map: FileInput;
   files: FileInput[];
@@ -619,12 +670,14 @@ export interface VerifyMapArgs {
   source?: HistorySource;
 }
 
+/** Public TypeScript wire shape for FileVerifyStatus in the signature-client facade. */
 export type FileVerifyStatus =
   | "verified"
   | "invalid"
   | "tampered"
   | "not_in_map";
 
+/** Public TypeScript wire shape for MapVerify in the signature-client facade. */
 export interface MapVerify {
   results: Array<{
     path: string;
@@ -644,6 +697,7 @@ export interface MapVerify {
   missingFromBatch: string[];
 }
 
+/** Public TypeScript wire shape for MapFileInfo in the signature-client facade. */
 export interface MapFileInfo {
   path: string;
   contentHash: string;
@@ -652,6 +706,7 @@ export interface MapFileInfo {
   info: Json;
 }
 
+/** Public TypeScript wire shape for OrderArgs in the signature-client facade. */
 export interface OrderArgs {
   input: FileInput;
   /** Set for a detached order check. */
@@ -661,6 +716,7 @@ export interface OrderArgs {
   source?: HistorySource;
 }
 
+/** Public TypeScript wire shape for MapOrder in the signature-client facade. */
 export interface MapOrder {
   path: string;
   resolveStatus: string;
@@ -670,8 +726,10 @@ export interface MapOrder {
 
 // ─── Stamps ──────────────────────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for StampAssetKind in the signature-client facade. */
 export type StampAssetKind = "image" | "audio" | "video" | "text";
 
+/** Public TypeScript wire shape for StampMeta in the signature-client facade. */
 export interface StampMeta {
   id: string;
   kind: StampAssetKind;
@@ -683,6 +741,7 @@ export interface StampMeta {
   lastUpdate: string;
 }
 
+/** Public TypeScript wire shape for CreateStampArgs in the signature-client facade. */
 export interface CreateStampArgs {
   input: FileInput;
   kind: StampAssetKind;
@@ -691,6 +750,7 @@ export interface CreateStampArgs {
   accountId?: string;
 }
 
+/** Public TypeScript wire shape for SkippedItem in the signature-client facade. */
 export interface SkippedItem {
   id: string;
   reason: string;
@@ -698,17 +758,20 @@ export interface SkippedItem {
 
 // ─── Contacts & groups ───────────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for SerializedMajikContactGroup in the signature-client facade. */
 export interface SerializedMajikContactGroup extends Json {
   id: string;
   isSystem: boolean;
   memberIds: string[];
 }
 
+/** Public TypeScript wire shape for ApiResponse in the signature-client facade. */
 export interface ApiResponse {
   success: boolean;
   message: string;
 }
 
+/** Public TypeScript wire shape for CreateGroupArgs in the signature-client facade. */
 export interface CreateGroupArgs {
   id: string;
   name: string;
@@ -716,6 +779,7 @@ export interface CreateGroupArgs {
   initialMemberIds?: string[];
 }
 
+/** Public TypeScript wire shape for UpdateGroupMetaArgs in the signature-client facade. */
 export interface UpdateGroupMetaArgs {
   id: string;
   name?: string;
@@ -725,6 +789,7 @@ export interface UpdateGroupMetaArgs {
 
 // ─── Logs & preferences ──────────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for HistoryLog in the signature-client facade. */
 export interface HistoryLog extends Json {
   id: string;
   reference_id: string;
@@ -742,6 +807,7 @@ export interface HistoryLog extends Json {
   valid?: boolean;
 }
 
+/** Public TypeScript wire shape for UserActivityLog in the signature-client facade. */
 export interface UserActivityLog extends Json {
   id: string;
   reference_id: string;
@@ -756,8 +822,10 @@ export type UserAppPreferences = Json;
 
 // ─── Backups ─────────────────────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for BackupType in the signature-client facade. */
 export type BackupType = "stamps" | "contacts" | "appData" | "unknown";
 
+/** Public TypeScript wire shape for AppDataSummary in the signature-client facade. */
 export interface AppDataSummary {
   contacts: SerializedMajikContact[];
   groups: SerializedMajikContactGroup[];
@@ -765,6 +833,7 @@ export interface AppDataSummary {
   preferences: UserAppPreferences | null;
 }
 
+/** Public TypeScript wire shape for SelectiveRestoreOptions in the signature-client facade. */
 export interface SelectiveRestoreOptions {
   stamps?: boolean;
   contacts?: boolean;
@@ -775,6 +844,7 @@ export interface SelectiveRestoreOptions {
 
 // ─── Hydration & events ──────────────────────────────────────────────────────
 
+/** Public TypeScript wire shape for SigHydrateReport in the signature-client facade. */
 export interface SigHydrateReport {
   contacts: { contactsLoaded: number; contactsSkipped: SkippedItem[] };
   historySkipped: SkippedItem[];
@@ -802,4 +872,5 @@ export interface SigOnlyEventMap {
   "activity-log": UserActivityLog;
 }
 
+/** Public TypeScript wire shape for SigOnlyEventType in the signature-client facade. */
 export type SigOnlyEventType = keyof SigOnlyEventMap;
